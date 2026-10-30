@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f7f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Escandallo">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="description" content="Calculadora de escandallo y costes para mezclas de piensos y cereales">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Escandallo de mezclas</title>
+<style>
+  /* =========================================================
+     ESTILOS · colores claros, botones grandes, pensado para móvil
+     ========================================================= */
+  :root {
+    --bg: #f5f7f2;
+    --card: #ffffff;
+    --ink: #1e2a1f;
+    --muted: #6a7468;
+    --line: #e2e7dd;
+    --soft: #eef2ea;
+    --accent: #2e7d4f;
+    --accent-dark: #23633e;
+    --accent-soft: #e3f1e7;
+    --warn: #a3520c;
+    --warn-soft: #fdf1e4;
+    --danger: #b3261e;
+    --danger-soft: #fdecea;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: 120px; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 17px;
+    line-height: 1.4;
+    -webkit-tap-highlight-color: transparent;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  }
+  [hidden] { display: none !important; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 0 14px; }
+
+  /* Cabecera */
+  .cabecera { display: flex; align-items: center; gap: 12px; padding: 18px 2px 12px; }
+  .logo { width: 46px; height: 46px; border-radius: 13px; background: var(--accent-soft); display: grid; place-items: center; flex: none; }
+  .cabecera h1 { font-size: 21px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+  .cabecera p { font-size: 14.5px; color: var(--muted); }
+
+  /* Pestañas */
+  .pestanas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: #e6ebe1; padding: 4px; border-radius: 14px; margin-bottom: 10px; }
+  .pestana {
+    appearance: none; -webkit-appearance: none; border: 0; background: transparent;
+    font: inherit; font-size: 16px; font-weight: 600; color: var(--muted);
+    min-height: 48px; border-radius: 11px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .pestana.activa { background: #fff; color: var(--accent-dark); box-shadow: 0 1px 3px rgba(30, 42, 31, .12); }
+  .contador { background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; min-width: 20px; height: 20px; line-height: 20px; border-radius: 10px; padding: 0 6px; text-align: center; }
+  .contador:empty { display: none; }
+
+  .vista { display: none; }
+  .vista.activa { display: block; }
+
+  /* Resumen (se queda fijo arriba al hacer scroll) */
+  .resumen {
+    position: sticky; top: env(safe-area-inset-top); z-index: 5;
+    display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 8px;
+    margin: 0 -14px; padding: 8px 14px 12px; background: var(--bg);
+  }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 11px; min-width: 0; display: flex; flex-direction: column; }
+  .tile .lbl { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .val { display: block; font-size: 26px; font-weight: 700; line-height: 1.15; margin: 3px 0 1px; white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
+  .tile .uni { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile.destacado { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tile.destacado .lbl, .tile.destacado .uni { color: rgba(255, 255, 255, .9); }
+
+  /* Tarjetas */
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .card h2 { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  .nota { color: var(--muted); font-size: 14.5px; margin: 2px 0 6px; }
+  .nota.centro { text-align: center; margin-top: 12px; margin-bottom: 0; }
+
+  /* Filas de ingredientes */
+  .fila { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .fila:last-child { border-bottom: 0; padding-bottom: 2px; }
+  .punto { width: 12px; height: 12px; border-radius: 50%; flex: none; display: inline-block; }
+  .fila-info { flex: 1; min-width: 0; }
+  .fila-info label { display: block; font-size: 18px; font-weight: 600; }
+  .fila-info small { display: block; font-size: 14px; color: var(--muted); }
+  .falta { color: var(--warn) !important; }
+
+  .caja { position: relative; flex: none; width: 46%; max-width: 200px; }
+  .caja input {
+    width: 100%; font: inherit; font-size: 20px; font-weight: 600; text-align: right;
+    padding: 12px 42px 12px 12px; min-height: 54px;
+    border: 1.5px solid var(--line); border-radius: 12px; background: #fafbf8; color: var(--ink);
+    font-variant-numeric: tabular-nums; -webkit-appearance: none; appearance: none;
+  }
+  .caja.ancha input { padding-right: 60px; }
+  .caja input::placeholder { color: #b3bab0; }
+  .caja input:focus, .campo-texto:focus { outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px var(--accent-soft); }
+  .fila.con-valor .caja input { border-color: #bcd9c5; background: #f4faf6; }
+  .caja input.mal, .fila.con-valor .caja input.mal { border-color: var(--danger); background: var(--danger-soft); }
+  .sufijo { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 15px; color: var(--muted); pointer-events: none; }
+
+  /* Desglose */
+  .pila { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--soft); margin: 10px 0 4px; }
+  .pila span { height: 100%; }
+  .pila span + span { box-shadow: inset 2px 0 0 #fff; }
+  .tabla { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .tabla th { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 12px 4px 6px; border-bottom: 1px solid var(--line); }
+  .tabla td { padding: 10px 4px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 16px; }
+  .tabla td:first-child { font-weight: 600; }
+  .tabla td .punto { width: 10px; height: 10px; margin-right: 8px; vertical-align: 1px; }
+  .tabla small { display: block; font-size: 13px; color: var(--muted); font-weight: 400; }
+  .tabla td:first-child small { padding-left: 18px; }
+  .tabla .num { text-align: right; white-space: nowrap; }
+  .tabla tfoot td { border-bottom: 0; font-weight: 700; padding-top: 12px; }
+  .tabla tfoot td:first-child small { padding-left: 0; }
+  .barra { height: 5px; width: 72px; margin: 6px 0 0 auto; background: var(--soft); border-radius: 3px; overflow: hidden; }
+  .barra i { display: block; height: 100%; border-radius: 3px; }
+
+  /* Campos de texto y botones */
+  .lbl-campo { display: block; font-weight: 600; margin-bottom: 6px; }
+  .lbl-campo span { color: var(--muted); font-weight: 400; }
+  .campo-texto { width: 100%; font: inherit; font-size: 18px; padding: 12px 14px; min-height: 52px; border: 1.5px solid var(--line); border-radius: 12px; background: #fafbf8; color: var(--ink); -webkit-appearance: none; appearance: none; }
+
+  .botones { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; margin-top: 12px; }
+  .btn {
+    appearance: none; -webkit-appearance: none; border: 0; font: inherit; font-size: 18px; font-weight: 700;
+    min-height: 58px; padding: 12px 16px; border-radius: 14px; cursor: pointer; width: 100%;
+    transition: transform .08s ease, background .15s ease;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn.principal { background: var(--accent); color: #fff; }
+  .btn.principal:active { background: var(--accent-dark); }
+  .btn.secundario { background: #fff; color: var(--ink); border: 1.5px solid #cfd6ca; }
+  .btn.peligro { background: var(--danger-soft); color: var(--danger); }
+  .btn.peq { min-height: 48px; font-size: 16px; }
+  #btnGuardarPrecios { margin-top: 14px; }
+
+  /* Avisos */
+  .aviso { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--warn-soft); border: 1px solid #f1d3b0; color: #7a3d08; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; font-size: 15px; }
+  .aviso.info { background: var(--accent-soft); border-color: #c6e1cf; color: var(--accent-dark); }
+  .aviso.error { background: var(--danger-soft); border-color: #f3c7c2; color: var(--danger); }
+  .enlace { appearance: none; -webkit-appearance: none; background: #fff; color: inherit; font: inherit; font-weight: 700; padding: 8px 12px; min-height: 42px; border-radius: 10px; border: 1px solid currentColor; white-space: nowrap; cursor: pointer; flex: none; }
+  .instalar-botones { display: flex; align-items: center; gap: 2px; flex: none; }
+  .cerrar { appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: inherit; font-size: 26px; line-height: 1; width: 42px; height: 42px; border-radius: 10px; cursor: pointer; }
+  .vacio { color: var(--muted); font-size: 15px; padding: 6px 0 2px; }
+  .vacio-grande { text-align: center; color: var(--muted); padding: 36px 20px; }
+
+  /* Historial */
+  .mg-cabecera { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .mg-cabecera h3 { font-size: 18px; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+  .mg-fecha { font-size: 13.5px; color: var(--muted); white-space: nowrap; }
+  .mg-datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+  .mg-datos div { background: var(--bg); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+  .mg-datos span { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .mg-datos b { font-size: 16px; font-variant-numeric: tabular-nums; }
+  .mg-datos .destacado { background: var(--accent-soft); }
+  .mg-datos .destacado b { color: var(--accent-dark); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--soft); border-radius: 999px; padding: 5px 10px; font-size: 13.5px; }
+  .chip .punto { width: 9px; height: 9px; }
+  .mezcla-guardada .botones { grid-template-columns: 1fr 1fr; }
+
+  /* Mensaje flotante */
+  .toast {
+    position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom));
+    transform: translate(-50%, 140%); opacity: 0; pointer-events: none;
+    background: #1e2a1f; color: #fff; border-radius: 14px; padding: 8px 8px 8px 16px;
+    display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100% - 24px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .18); transition: transform .25s ease, opacity .25s ease; z-index: 50; font-size: 16px;
+  }
+  .toast.visible { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+  #toastTxt { padding: 8px 8px 8px 0; }
+  .toast button { appearance: none; -webkit-appearance: none; border: 0; background: rgba(255, 255, 255, .14); color: #a8e6bd; font: inherit; font-weight: 700; padding: 8px 14px; min-height: 44px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
+
+  /* Móviles pequeños (iPhone SE y similares) */
+  @media (max-width: 360px) {
+    .resumen { gap: 6px; }
+    .tile { padding: 9px 8px; }
+    .tile .lbl { font-size: 10.5px; letter-spacing: .02em; }
+    .tile .uni { font-size: 11px; }
+    .caja { width: 42%; }
+    .caja input { font-size: 19px; padding-right: 38px; }
+    .caja.ancha input { padding-right: 54px; }
+    .sufijo { right: 10px; font-size: 14px; }
+    .fila-info label { font-size: 17px; }
+  }
+
+  .pie { text-align: center; color: var(--muted); font-size: 13px; margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="cabecera">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#2e7d4f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22V8"/>
+        <path d="M12 12c-2.5 0-4-1.5-4-4 2.5 0 4 1.5 4 4z"/>
+        <path d="M12 12c2.5 0 4-1.5 4-4-2.5 0-4 1.5-4 4z"/>
+        <path d="M12 17c-2.5 0-4-1.5-4-4 2.5 0 4 1.5 4 4z"/>
+        <path d="M12 17c2.5 0 4-1.5 4-4-2.5 0-4 1.5-4 4z"/>
+        <path d="M12 8c-1.2-1-1.2-3 0-5 1.2 2 1.2 4 0 5z"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Escandallo de mezclas</h1>
+      <p>Coste de piensos y cereales</p>
+    </div>
+  </header>
+
+  <div class="aviso error" id="avisoAlmacen" hidden>
+    Este navegador no deja guardar datos (¿modo incógnito?). La calculadora funciona, pero no recordará los precios.
+  </div>
+
+  <div class="aviso info" id="avisoInstalar" hidden>
+    <span id="avisoInstalarTxt">Instala la calculadora como app en tu móvil.</span>
+    <div class="instalar-botones">
+      <button type="button" class="enlace" id="btnInstalar">Instalar</button>
+      <button type="button" class="cerrar" id="btnCerrarInstalar" aria-label="Cerrar aviso">×</button>
+    </div>
+  </div>
+
+  <nav class="pestanas" role="tablist">
+    <button type="button" class="pestana activa" role="tab" data-vista="mezcla" aria-selected="true">Mezcla</button>
+    <button type="button" class="pestana" role="tab" data-vista="precios" aria-selected="false">Precios</button>
+    <button type="button" class="pestana" role="tab" data-vista="historial" aria-selected="false">Historial <span class="contador" id="contHist"></span></button>
+  </nav>
+
+  <!-- ===================== PANTALLA: MEZCLA ===================== -->
+  <section id="vista-mezcla" class="vista activa" role="tabpanel">
+    <div class="resumen" aria-live="polite">
+      <div class="tile">
+        <span class="lbl">Kilos</span>
+        <span class="val" id="totKg">0</span>
+        <span class="uni">kg del lote</span>
+      </div>
+      <div class="tile">
+        <span class="lbl">Coste</span>
+        <span class="val" id="totEur">0,00</span>
+        <span class="uni">€ del lote</span>
+      </div>
+      <div class="tile destacado">
+        <span class="lbl">Coste medio</span>
+        <span class="val" id="totMedia">—</span>
+        <span class="uni">€/kg revuelto</span>
+      </div>
+    </div>
+
+    <div class="aviso" id="avisoPrecios" hidden>
+      <span id="avisoPreciosTxt"></span>
+      <button type="button" class="enlace" data-ir="precios">Poner precios</button>
+    </div>
+
+    <div class="card">
+      <h2>Kilos de cada ingrediente</h2>
+      <div id="listaMezcla"></div>
+    </div>
+
+    <div class="card">
+      <h2>Desglose del lote</h2>
+      <p class="vacio" id="desgloseVacio">Introduce los kilos para ver el reparto.</p>
+      <div id="desglose" hidden>
+        <div class="pila" id="pila" aria-hidden="true"></div>
+        <table class="tabla">
+          <thead>
+            <tr><th>Ingrediente</th><th class="num">% peso</th><th class="num">Coste</th></tr>
+          </thead>
+          <tbody id="tablaCuerpo"></tbody>
+          <tfoot>
+            <tr>
+              <td>Total<small id="pieKg"></small></td>
+              <td class="num">100&nbsp;%</td>
+              <td class="num"><span id="pieEur"></span><small id="pieMedia"></small></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <label class="lbl-campo" for="nombreLote">Nombre del lote <span>(opcional)</span></label>
+      <input id="nombreLote" class="campo-texto" type="text" placeholder="Ej.: Saca terneros nº 12" maxlength="60" autocomplete="off" enterkeyhint="done">
+      <div class="botones">
+        <button type="button" class="btn principal" id="btnGuardar">Guardar mezcla</button>
+        <button type="button" class="btn secundario" id="btnLimpiar">Limpiar</button>
+      </div>
+      <p class="nota">«Guardar» la pasa al historial y deja los campos vacíos para la siguiente. «Limpiar» borra los campos sin guardar.</p>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: PRECIOS ===================== -->
+  <section id="vista-precios" class="vista" role="tabpanel">
+    <div class="aviso info" id="avisoPrimeraVez" hidden>
+      Empieza poniendo el precio por kilo de cada ingrediente. Se quedan guardados en este móvil.
+    </div>
+    <div class="card">
+      <h2>Precio por kilo (€/kg)</h2>
+      <p class="nota">Se guardan solos al escribir. Puedes usar coma o punto para los decimales.</p>
+      <div id="listaPrecios"></div>
+      <button type="button" class="btn principal" id="btnGuardarPrecios">Guardar precios</button>
+      <p class="nota centro" id="preciosFecha"></p>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: HISTORIAL ===================== -->
+  <section id="vista-historial" class="vista" role="tabpanel">
+    <div class="card vacio-grande" id="historialVacio">
+      Aún no has guardado ninguna mezcla.<br>Cuando pulses «Guardar mezcla» aparecerá aquí.
+    </div>
+    <div id="listaHistorial"></div>
+  </section>
+
+  <p class="pie">Los datos se guardan solo en este dispositivo · v1</p>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span id="toastTxt"></span>
+  <button type="button" id="toastBtn" hidden></button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =========================================================
+     1. INGREDIENTES
+     Para añadir, quitar o renombrar ingredientes, edita esta lista.
+     "id" debe ser único, en minúsculas y sin espacios ni tildes.
+     ========================================================= */
+  const INGREDIENTES = [
+    { id: 'cebada',    nombre: 'Cebada',    color: '#c99a2e' },
+    { id: 'maiz',      nombre: 'Maíz',      color: '#f2c94c' },
+    { id: 'girasol',   nombre: 'Girasol',   color: '#5b6770' },
+    { id: 'alfalfa',   nombre: 'Alfalfa',   color: '#4f9d69' },
+    { id: 'avena',     nombre: 'Avena',     color: '#b8a07e' },
+    { id: 'guisantes', nombre: 'Guisantes', color: '#9bcf53' },
+    { id: 'pienso',    nombre: 'Pienso',    color: '#8b5e3c' },
+    { id: 'naranja',   nombre: 'Naranja',   color: '#f2994a' }
+  ];
+
+  // Claves con las que se guarda todo en localStorage
+  const CLAVES = {
+    precios: 'escandallo.precios',
+    preciosFecha: 'escandallo.preciosFecha',
+    borrador: 'escandallo.borrador',
+    historial: 'escandallo.historial',
+    ocultarInstalar: 'escandallo.ocultarInstalar'
+  };
+  const MAX_HISTORIAL = 300;
+
+  /* =========================================================
+     2. ALMACENAMIENTO (localStorage con protección de errores)
+     ========================================================= */
+  let almacenOK = true;
+  try {
+    localStorage.setItem('__prueba__', '1');
+    localStorage.removeItem('__prueba__');
+  } catch (e) {
+    almacenOK = false;
+  }
+
+  function leer(clave, defecto) {
+    if (!almacenOK) return defecto;
+    try {
+      const texto = localStorage.getItem(clave);
+      return texto === null ? defecto : JSON.parse(texto);
+    } catch (e) {
+      return defecto;
+    }
+  }
+
+  function guardar(clave, valor) {
+    if (!almacenOK) return false;
+    try {
+      localStorage.setItem(clave, JSON.stringify(valor));
+      return true;
+    } catch (e) {
+      $('#avisoAlmacen').hidden = false;
+      return false;
+    }
+  }
+
+  /* =========================================================
+     3. NÚMEROS: lectura (acepta coma o punto) y formato español
+     ========================================================= */
+  // Devuelve 0 si está vacío, NaN si no es un número válido.
+  // Con permitirMiles = true, "1.500" se entiende como 1500 (útil para kilos).
+  function leerNumero(texto, permitirMiles) {
+    let t = String(texto == null ? '' : texto).trim().replace(/\s+/g, '');
+    if (t === '') return 0;
+    if (t.indexOf(',') > -1 && t.indexOf('.') > -1) {
+      t = t.replace(/\./g, '').replace(',', '.');          // 1.250,5 → 1250.5
+    } else if (permitirMiles && /^[1-9]\d{0,2}(\.\d{3})+$/.test(t)) {
+      t = t.replace(/\./g, '');                             // 1.500 → 1500
+    } else {
+      t = t.replace(',', '.');                              // 0,25 → 0.25
+    }
+    if (!/^(\d+\.?\d*|\.\d+)$/.test(t)) return NaN;
+    return parseFloat(t);
+  }
+
+  // Convierte un número en texto para rellenar un campo (0,25 en vez de 0.25)
+  function numeroATexto(n) {
+    if (!n) return '';
+    return String(Math.round(n * 10000) / 10000).replace('.', ',');
+  }
+
+  const formatos = {};
+  function fmt(n, maxDec, minDec) {
+    if (minDec === undefined) minDec = maxDec;
+    const k = maxDec + '|' + minDec;
+    if (!formatos[k]) {
+      formatos[k] = new Intl.NumberFormat('es-ES', { minimumFractionDigits: minDec, maximumFractionDigits: maxDec });
+    }
+    return formatos[k].format(n);
+  }
+  const fKg    = n => fmt(n, 2, 0);              // 1250 · 12,5
+  const fEur   = n => fmt(n, 2);                 // 78,00
+  const fPrecio = n => fmt(n, 4, 3);             // 0,250 · 0,2875
+  const fMedia = n => fmt(n, 3);                 // 0,260
+  const fPct   = n => fmt(n, 1) + ' %';     // 66,7 %
+
+  /* =========================================================
+     4. UTILIDADES
+     ========================================================= */
+  const $ = sel => document.querySelector(sel);
+
+  function escapar(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function colorDe(id) {
+    const ing = INGREDIENTES.find(x => x.id === id);
+    return ing ? ing.color : '#9aa39a';
+  }
+  function fechaCorta(iso) {
+    const f = new Date(iso);
+    if (isNaN(f)) return '';
+    return f.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) +
+      ', ' + f.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Mensaje flotante abajo, con botón opcional (p. ej. "Deshacer")
+  let toastTimer = null;
+  let toastAccion = null;
+  function avisar(texto, textoBoton, accion) {
+    $('#toastTxt').textContent = texto;
+    const b = $('#toastBtn');
+    if (textoBoton && accion) {
+      b.textContent = textoBoton;
+      b.hidden = false;
+      toastAccion = accion;
+    } else {
+      b.hidden = true;
+      toastAccion = null;
+    }
+    $('#toast').classList.add('visible');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $('#toast').classList.remove('visible'), textoBoton ? 6000 : 2800);
+  }
+  $('#toastBtn').addEventListener('click', () => {
+    const accion = toastAccion;
+    toastAccion = null;
+    $('#toast').classList.remove('visible');
+    if (accion) accion();
+  });
+
+  // Reduce la letra de las cifras grandes si no caben en su recuadro
+  function ajustarTexto(el, max, min) {
+    el.style.fontSize = max + 'px';
+    if (!el.clientWidth) return;
+    let s = max;
+    while (el.scrollWidth > el.clientWidth && s > min) {
+      s--;
+      el.style.fontSize = s + 'px';
+    }
+  }
+  function ajustarResumen() {
+    document.querySelectorAll('.tile .val').forEach(el => ajustarTexto(el, 26, 14));
+  }
+
+  /* =========================================================
+     5. ESTADO (se carga de la memoria del navegador)
+     ========================================================= */
+  const precios = {};
+  const preciosGuardados = leer(CLAVES.precios, {}) || {};
+  INGREDIENTES.forEach(ing => {
+    const p = Number(preciosGuardados[ing.id]);
+    precios[ing.id] = isFinite(p) && p >= 0 ? p : 0;
+  });
+  let preciosFecha = leer(CLAVES.preciosFecha, null);
+  let historial = leer(CLAVES.historial, []);
+  if (!Array.isArray(historial)) historial = [];
+
+  /* =========================================================
+     6. CONSTRUCCIÓN DE LAS FILAS DE INGREDIENTES
+     ========================================================= */
+  const campoKg = {}, filaKg = {}, infoKg = {};
+  const campoPrecio = {}, infoPrecio = {};
+  const listaCamposKg = [], listaCamposPrecio = [];
+
+  INGREDIENTES.forEach((ing, i) => {
+    const ultimo = i === INGREDIENTES.length - 1;
+
+    // Fila en la pantalla de Mezcla
+    const fila = document.createElement('div');
+    fila.className = 'fila';
+    fila.innerHTML =
+      `<span class="punto" style="background:${ing.color}"></span>
+       <div class="fila-info"><label for="kg-${ing.id}">${ing.nombre}</label><small></small></div>
+       <div class="caja">
+         <input id="kg-${ing.id}" type="text" inputmode="decimal" autocomplete="off" placeholder="0" enterkeyhint="${ultimo ? 'done' : 'next'}">
+         <span class="sufijo">kg</span>
+       </div>`;
+    $('#listaMezcla').appendChild(fila);
+    filaKg[ing.id] = fila;
+    infoKg[ing.id] = fila.querySelector('small');
+    campoKg[ing.id] = fila.querySelector('input');
+    listaCamposKg.push(campoKg[ing.id]);
+
+    // Fila en la pantalla de Precios
+    const filaP = document.createElement('div');
+    filaP.className = 'fila';
+    filaP.innerHTML =
+      `<span class="punto" style="background:${ing.color}"></span>
+       <div class="fila-info"><label for="precio-${ing.id}">${ing.nombre}</label><small></small></div>
+       <div class="caja ancha">
+         <input id="precio-${ing.id}" type="text" inputmode="decimal" autocomplete="off" placeholder="0,000" enterkeyhint="${ultimo ? 'done' : 'next'}">
+         <span class="sufijo">€/kg</span>
+       </div>`;
+    $('#listaPrecios').appendChild(filaP);
+    infoPrecio[ing.id] = filaP.querySelector('small');
+    campoPrecio[ing.id] = filaP.querySelector('input');
+    listaCamposPrecio.push(campoPrecio[ing.id]);
+  });
+
+  // Al tocar un campo se selecciona su contenido; "Intro" salta al siguiente
+  function prepararNavegacion(lista) {
+    lista.forEach((input, i) => {
+      input.addEventListener('focus', () => {
+        setTimeout(() => { try { input.select(); } catch (e) { /* nada */ } }, 0);
+      });
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (lista[i + 1]) lista[i + 1].focus();
+          else input.blur();
+        }
+      });
+    });
+  }
+  prepararNavegacion(listaCamposKg);
+  prepararNavegacion(listaCamposPrecio);
+
+  /* =========================================================
+     7. CÁLCULO EN TIEMPO REAL
+     ========================================================= */
+  let calculo = null;
+
+  function recalcular() {
+    let totalKg = 0, totalEur = 0, hayErrores = false;
+    const sinPrecio = [];
+
+    const filas = INGREDIENTES.map(ing => {
+      const input = campoKg[ing.id];
+      let kg = leerNumero(input.value, true);
+      const malo = Number.isNaN(kg);
+      input.classList.toggle('mal', malo);
+      if (malo) { kg = 0; hayErrores = true; }
+
+      const precio = precios[ing.id] || 0;
+      const coste = kg * precio;
+      totalKg += kg;
+      totalEur += coste;
+      if (kg > 0 && precio <= 0) sinPrecio.push(ing.nombre);
+
+      // Texto pequeño bajo el nombre del ingrediente
+      filaKg[ing.id].classList.toggle('con-valor', kg > 0);
+      const info = infoKg[ing.id];
+      if (malo) {
+        info.textContent = 'Número no válido';
+        info.classList.add('falta');
+      } else if (precio > 0) {
+        info.textContent = fPrecio(precio) + ' €/kg' + (kg > 0 ? ' · ' + fEur(coste) + ' €' : '');
+        info.classList.remove('falta');
+      } else {
+        info.textContent = 'Sin precio';
+        info.classList.add('falta');
+      }
+
+      return { id: ing.id, nombre: ing.nombre, color: ing.color, kg, precio, coste };
+    });
+
+    const media = totalKg > 0 ? totalEur / totalKg : null;
+    calculo = { filas, totalKg, totalEur, media, hayErrores, sinPrecio };
+
+    pintarResumen();
+    pintarDesglose();
+    pintarAvisoPrecios();
+  }
+
+  function pintarResumen() {
+    $('#totKg').textContent = fKg(calculo.totalKg);
+    $('#totEur').textContent = fEur(calculo.totalEur);
+    $('#totMedia').textContent = calculo.media === null ? '—' : fMedia(calculo.media);
+    ajustarResumen();
+  }
+
+  function pintarDesglose() {
+    const c = calculo;
+    const conKilos = c.filas.filter(f => f.kg > 0);
+    $('#desgloseVacio').hidden = conKilos.length > 0;
+    $('#desglose').hidden = conKilos.length === 0;
+    if (!conKilos.length) return;
+
+    const pila = $('#pila');
+    const cuerpo = $('#tablaCuerpo');
+    pila.innerHTML = '';
+    cuerpo.innerHTML = '';
+
+    conKilos.forEach(f => {
+      const pctPeso = f.kg / c.totalKg * 100;
+      const pctCoste = c.totalEur > 0 ? f.coste / c.totalEur * 100 : 0;
+
+      const seg = document.createElement('span');
+      seg.style.width = pctPeso + '%';
+      seg.style.background = f.color;
+      pila.appendChild(seg);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td><span class="punto" style="background:${f.color}"></span>${f.nombre}<small>${fKg(f.kg)} kg</small></td>
+         <td class="num">${fPct(pctPeso)}<div class="barra"><i style="width:${pctPeso}%;background:${f.color}"></i></div></td>
+         <td class="num">${f.precio > 0
+            ? fEur(f.coste) + ' €<small>' + fPct(pctCoste) + ' del coste</small>'
+            : '<span class="falta">Sin precio</span>'}</td>`;
+      cuerpo.appendChild(tr);
+    });
+
+    $('#pieKg').textContent = fKg(c.totalKg) + ' kg';
+    $('#pieEur').textContent = fEur(c.totalEur) + ' €';
+    $('#pieMedia').textContent = c.media === null ? '' : fMedia(c.media) + ' €/kg';
+  }
+
+  function pintarAvisoPrecios() {
+    const faltan = calculo.sinPrecio;
+    $('#avisoPrecios').hidden = faltan.length === 0;
+    if (faltan.length) {
+      $('#avisoPreciosTxt').textContent = 'Falta el precio de: ' + faltan.join(', ') + '. Su coste cuenta como 0 €.';
+    }
+  }
+
+  /* =========================================================
+     8. FORMULARIO DE MEZCLA: borrador, limpiar y guardar
+     ========================================================= */
+  function leerFormulario() {
+    const kg = {};
+    INGREDIENTES.forEach(ing => { kg[ing.id] = campoKg[ing.id].value; });
+    return { kg, nombre: $('#nombreLote').value };
+  }
+
+  function guardarBorrador() {
+    guardar(CLAVES.borrador, leerFormulario());
+  }
+
+  function ponerFormulario(datos) {
+    INGREDIENTES.forEach(ing => {
+      campoKg[ing.id].value = (datos && datos.kg && datos.kg[ing.id]) || '';
+    });
+    $('#nombreLote').value = (datos && datos.nombre) || '';
+    recalcular();
+    guardarBorrador();
+  }
+
+  function formularioVacio() {
+    return INGREDIENTES.every(ing => !campoKg[ing.id].value.trim()) && !$('#nombreLote').value.trim();
+  }
+
+  listaCamposKg.forEach(input => {
+    input.addEventListener('input', () => { recalcular(); guardarBorrador(); });
+  });
+  $('#nombreLote').addEventListener('input', guardarBorrador);
+  $('#nombreLote').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+  });
+
+  function limpiar() {
+    if (formularioVacio()) {
+      avisar('Los campos ya están vacíos');
+      return;
+    }
+    const antes = leerFormulario();
+    ponerFormulario(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    avisar('Campos limpios. Nueva mezcla.', 'Deshacer', () => ponerFormulario(antes));
+  }
+
+  function guardarMezcla() {
+    recalcular();
+    const c = calculo;
+    if (c.hayErrores) {
+      avisar('Revisa los campos marcados en rojo');
+      return;
+    }
+    if (c.totalKg <= 0) {
+      avisar('Introduce algún kilo antes de guardar');
+      return;
+    }
+    const mezcla = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      fecha: new Date().toISOString(),
+      nombre: $('#nombreLote').value.trim(),
+      items: c.filas.filter(f => f.kg > 0).map(f => ({
+        id: f.id, nombre: f.nombre, kg: f.kg, precio: f.precio, coste: f.coste
+      })),
+      totalKg: c.totalKg,
+      totalEur: c.totalEur,
+      media: c.media
+    };
+    historial.unshift(mezcla);
+    if (historial.length > MAX_HISTORIAL) historial.length = MAX_HISTORIAL;
+    guardar(CLAVES.historial, historial);
+    pintarHistorial();
+
+    ponerFormulario(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const texto = c.sinPrecio.length ? 'Guardada (faltaban precios)' : 'Mezcla guardada en el historial';
+    avisar(texto, 'Ver', () => irA('historial'));
+  }
+
+  $('#btnLimpiar').addEventListener('click', limpiar);
+  $('#btnGuardar').addEventListener('click', guardarMezcla);
+
+  /* =========================================================
+     9. PANTALLA DE PRECIOS
+     ========================================================= */
+  function pintarInfoPrecio(id, malo) {
+    const el = infoPrecio[id];
+    const p = precios[id];
+    if (malo) {
+      el.textContent = 'Número no válido';
+      el.className = 'falta';
+    } else if (p > 0) {
+      el.textContent = '= ' + fmt(p * 1000, 2) + ' €/tonelada';
+      el.className = '';
+    } else {
+      el.textContent = 'Sin precio';
+      el.className = 'falta';
+    }
+  }
+
+  function pintarFechaPrecios() {
+    const el = $('#preciosFecha');
+    if (!almacenOK) { el.textContent = 'No se pueden guardar en este navegador.'; return; }
+    el.textContent = preciosFecha ? '✓ Guardados · última modificación: ' + fechaCorta(preciosFecha) : '';
+  }
+
+  function guardarPrecios() {
+    const ok = guardar(CLAVES.precios, precios);
+    if (ok) {
+      preciosFecha = new Date().toISOString();
+      guardar(CLAVES.preciosFecha, preciosFecha);
+    }
+    pintarFechaPrecios();
+    return ok;
+  }
+
+  INGREDIENTES.forEach(ing => {
+    const input = campoPrecio[ing.id];
+    input.value = numeroATexto(precios[ing.id]);
+    pintarInfoPrecio(ing.id, false);
+
+    input.addEventListener('input', () => {
+      const valor = leerNumero(input.value);
+      const malo = Number.isNaN(valor);
+      input.classList.toggle('mal', malo);
+      if (!malo) {
+        precios[ing.id] = valor;
+        guardarPrecios();                       // guardado automático
+      }
+      pintarInfoPrecio(ing.id, malo);
+      if (INGREDIENTES.some(x => precios[x.id] > 0)) $('#avisoPrimeraVez').hidden = true;
+      recalcular();
+    });
+
+    // Al salir del campo, se muestra el precio con coma (0.28 → 0,28)
+    input.addEventListener('blur', () => {
+      if (!input.classList.contains('mal')) input.value = numeroATexto(precios[ing.id]);
+    });
+  });
+
+  $('#btnGuardarPrecios').addEventListener('click', () => {
+    if (listaCamposPrecio.some(input => input.classList.contains('mal'))) {
+      avisar('Revisa los precios marcados en rojo');
+      return;
+    }
+    if (guardarPrecios()) avisar('Precios guardados', 'Ir a mezcla', () => irA('mezcla'));
+    else avisar('No se han podido guardar los precios');
+  });
+
+  /* =========================================================
+     10. HISTORIAL DE MEZCLAS GUARDADAS
+     ========================================================= */
+  function pintarHistorial() {
+    const cont = $('#listaHistorial');
+    cont.innerHTML = '';
+    $('#historialVacio').hidden = historial.length > 0;
+    $('#contHist').textContent = historial.length ? String(historial.length) : '';
+
+    historial.forEach(m => {
+      const art = document.createElement('article');
+      art.className = 'card mezcla-guardada';
+      art.dataset.id = m.id;
+      const chips = (m.items || []).map(it =>
+        `<span class="chip"><span class="punto" style="background:${colorDe(it.id)}"></span>${escapar(it.nombre)} · ${fKg(it.kg)} kg · ${fPct(m.totalKg > 0 ? it.kg / m.totalKg * 100 : 0)}</span>`
+      ).join('');
+      art.innerHTML =
+        `<div class="mg-cabecera"><h3></h3><span class="mg-fecha">${fechaCorta(m.fecha)}</span></div>
+         <div class="mg-datos">
+           <div><span>Kilos</span><b>${fKg(m.totalKg)} kg</b></div>
+           <div><span>Coste</span><b>${fEur(m.totalEur)} €</b></div>
+           <div class="destacado"><span>€/kg</span><b>${m.media == null ? '—' : fMedia(m.media)}</b></div>
+         </div>
+         <div class="chips">${chips}</div>
+         <div class="botones">
+           <button type="button" class="btn secundario peq" data-accion="cargar">Cargar</button>
+           <button type="button" class="btn peligro peq" data-accion="borrar">Borrar</button>
+         </div>`;
+      art.querySelector('h3').textContent = m.nombre || 'Mezcla sin nombre';
+      cont.appendChild(art);
+    });
+  }
+
+  function cargarMezcla(id) {
+    const m = historial.find(x => x.id === id);
+    if (!m) return;
+    const antes = leerFormulario();
+    const kg = {};
+    (m.items || []).forEach(it => { kg[it.id] = numeroATexto(it.kg); });
+    ponerFormulario({ kg, nombre: m.nombre });
+    irA('mezcla');
+    avisar('Cargada con los precios actuales', 'Deshacer', () => ponerFormulario(antes));
+  }
+
+  function borrarMezcla(id) {
+    const pos = historial.findIndex(x => x.id === id);
+    if (pos < 0) return;
+    const borrada = historial.splice(pos, 1)[0];
+    guardar(CLAVES.historial, historial);
+    pintarHistorial();
+    avisar('Mezcla borrada', 'Deshacer', () => {
+      historial.splice(Math.min(pos, historial.length), 0, borrada);
+      guardar(CLAVES.historial, historial);
+      pintarHistorial();
+    });
+  }
+
+  $('#listaHistorial').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-accion]');
+    if (!btn) return;
+    const id = btn.closest('[data-id]').dataset.id;
+    if (btn.dataset.accion === 'cargar') cargarMezcla(id);
+    if (btn.dataset.accion === 'borrar') borrarMezcla(id);
+  });
+
+  /* =========================================================
+     11. NAVEGACIÓN ENTRE PANTALLAS
+     ========================================================= */
+  function irA(vista) {
+    document.querySelectorAll('.pestana').forEach(b => {
+      const activa = b.dataset.vista === vista;
+      b.classList.toggle('activa', activa);
+      b.setAttribute('aria-selected', activa ? 'true' : 'false');
+    });
+    document.querySelectorAll('.vista').forEach(v => v.classList.toggle('activa', v.id === 'vista-' + vista));
+    window.scrollTo(0, 0);
+    if (vista === 'mezcla') ajustarResumen();
+  }
+
+  document.querySelectorAll('.pestana').forEach(b => b.addEventListener('click', () => irA(b.dataset.vista)));
+  document.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => irA(b.dataset.ir)));
+  window.addEventListener('resize', ajustarResumen);
+
+  /* =========================================================
+     12. APP INSTALABLE (PWA)
+     ========================================================= */
+  // Solo tiene sentido cuando la app está en internet con https (GitHub Pages)
+  // o en el propio ordenador (localhost) para hacer pruebas.
+  const servidaPorWeb = location.protocol === 'https:' ||
+    location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+  // El "service worker" guarda los archivos para que la app funcione sin internet
+  if (servidaPorWeb && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* la app funciona igual, pero necesitará conexión */ });
+  }
+
+  // Pide al navegador que no borre los datos guardados (precios e historial)
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().catch(() => {});
+  }
+
+  // Aviso para instalar la app (Android: botón; iPhone: instrucciones)
+  const yaInstalada = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let eventoInstalar = null;
+
+  function mostrarAvisoInstalar(texto, conBoton) {
+    if (yaInstalada || leer(CLAVES.ocultarInstalar, false)) return;
+    $('#avisoInstalarTxt').textContent = texto;
+    $('#btnInstalar').hidden = !conBoton;
+    $('#avisoInstalar').hidden = false;
+  }
+
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    eventoInstalar = e;
+    mostrarAvisoInstalar('Instala la calculadora como app en tu móvil.', true);
+  });
+
+  $('#btnInstalar').addEventListener('click', async () => {
+    if (!eventoInstalar) return;
+    eventoInstalar.prompt();
+    try { await eventoInstalar.userChoice; } catch (e) { /* nada */ }
+    eventoInstalar = null;
+    $('#avisoInstalar').hidden = true;
+  });
+
+  $('#btnCerrarInstalar').addEventListener('click', () => {
+    $('#avisoInstalar').hidden = true;
+    guardar(CLAVES.ocultarInstalar, true);
+  });
+
+  window.addEventListener('appinstalled', () => {
+    $('#avisoInstalar').hidden = true;
+    avisar('App instalada. Ábrela desde su icono.');
+  });
+
+  if (servidaPorWeb && esIOS && !yaInstalada) {
+    mostrarAvisoInstalar('Para instalarla: pulsa Compartir (□↑) y luego «Añadir a pantalla de inicio».', false);
+  }
+
+  /* =========================================================
+     13. ARRANQUE
+     ========================================================= */
+  if (!almacenOK) $('#avisoAlmacen').hidden = false;
+
+  const borrador = leer(CLAVES.borrador, null);
+  if (borrador && typeof borrador === 'object') ponerFormulario(borrador);
+  else recalcular();
+
+  pintarHistorial();
+  pintarFechaPrecios();
+
+  // La primera vez (sin precios) se abre directamente la pantalla de Precios
+  if (INGREDIENTES.some(ing => precios[ing.id] > 0)) {
+    irA('mezcla');
+  } else {
+    $('#avisoPrimeraVez').hidden = false;
+    irA('precios');
+  }
+})();
+</script>
+</body>
+</html>
